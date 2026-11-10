@@ -39,7 +39,9 @@ Score each axis from 0 to 2, then add the three scores.
 
 Overrides: auth, authorization, payments, crypto, data migrations, deletes, parsing input at a trust boundary and public API contracts score at least 5. Detectability 2 never scores below 4. If torn between two rows, take the higher one. Decide in seconds.
 
-Delegate only if the ticket would be shorter and clearer than the work, and the work needs more than about 5 tool calls or would pull several hundred lines into your context. Otherwise work inline. Run only independent stations in parallel.
+Delegate only if the ticket would be shorter and clearer than the work, and the work needs more than about 5 tool calls or would pull several hundred lines into your context. Otherwise work inline. Never delegate what three greps can do.
+
+Run only independent stations in parallel, and give each its own git worktree (`isolation: "worktree"`). Stations sharing one working copy see each other's half-finished files and slow each other's test runs. You merge the worktrees.
 
 ## 3. The grilled cheese rules
 
@@ -64,7 +66,8 @@ The tests are the spec. They are the ticket's definition of done and what the pa
 4. Refactor while the tests stay green, then run the whole relevant suite.
 
 - **Who writes the tests:** for work scoring 4 or more, the executive or sous writes them and a lower tier implements against them unchanged. For work scoring 3 or less, one tier writes both, tests first.
-- **Changing tests:** a lower tier must never edit, delete, skip or weaken a test. If it needs to, it escalates.
+- **Changing tests:** a lower tier must never delete, skip or weaken a test, or change what it asserts. Mechanical fixes that keep the assertion (a selector, an import, a renamed symbol) are allowed only if listed under TEST EDITS in its report. You approve each one at the pass. Anything else, it escalates.
+- **Guard tests:** when work sets a convention (design tokens, minimum sizes, date format, file encoding), add a test that fails when code drifts from it.
 - **Untestable code:** if code can't be tested (pure UI, an external system with no sandbox), say why and name the manual check to run instead. Never skip testing silently.
 - **What not to test:** implementation details, such as private calls or mocks of the project's own code.
 
@@ -76,45 +79,46 @@ Every delegation uses this ticket. The subagent sees nothing except what the tic
 TASK: <one sentence: the outcome, not the method>
 STATION: <files/dirs it may edit; everything else is read-only>
 INPUTS: <paths, symbols, file:line, facts already established>
-CONSTRAINTS: <size budget ~N lines, no new deps, style, security needs>
-DONE WHEN: `<test command>` passes; files in <test paths> unchanged; lint clean
+CONSTRAINTS: <size budget ~N lines, no new deps, style, security needs>;
+             edit files only with the Edit/Write tools, never shell rewrites
+DONE WHEN: `<test command>` passes; lint clean; `<build command>` passes;
+           UI: touched pages checked at <narrowest width, e.g. 390px>
 ESCALATE IF: ambiguous spec, edit needed outside STATION, 2 failed attempts,
              a test looks wrong, the work is riskier than this ticket says
-RETURN: <=15 lines: changes as file:line, test result, any ESCALATION. No file dumps.
+RETURN: <=15 lines: changes as file:line, test result, TEST EDITS (or none),
+        any ESCALATION. No file dumps.
 ```
 
 If you can't fill in TASK and DONE WHEN concretely, the spec isn't ready. Resolve it yourself or ask the user; don't delegate it.
 
 ## 6. The pass
 
-Nothing is committed or reported as done until all of these hold:
+Nothing is committed or reported as done until all of these hold. Your own edits go through the pass too.
 - You ran the DONE WHEN tests yourself and saw them pass. A subagent saying they pass is not enough.
-- `git diff` on the test paths shows the implementer left them unchanged.
-- Lint and type checks are clean.
+- `git diff` on the test paths shows only the TEST EDITS you approved.
+- Lint and type checks are clean, and the production build passes. Tests and lint don't catch build failures.
+- UI changes: you checked each touched page at the narrowest supported width, plus any page whose layout the change affects.
 - You read the diff against the grilled cheese rules: size against the estimate, and no abstractions or dependencies nobody asked for.
-- For work scoring 4 or more: a sous reviewed the diff, and the security scans the project requires have run.
+- **Hard gate.** Work scoring 4 or more, any migration, auth or validation change, and every deploy need both of these. Your own review never counts. If either is skipped, don't deploy, and say so in your report.
+  - A fresh sous subagent has reviewed the diff.
+  - The security scans the project requires have run.
+- Migrations that contain logic have run on a throwaway database. Reviewing the generated SQL is not enough.
 - For an irreversible step (running a migration, deploying, deleting data): the user approved it.
 
 If the pass fails, send the work back once with the exact failure. If it fails a second time, move it up one tier.
 
 ## 7. Escalation (lower tier to higher)
 
-A subagent can't ask questions while it works, so it escalates by stopping early and returning `ESCALATION:` with what it tried, the exact failure and the question. It escalates when:
-- the spec is ambiguous, or two readings both fit
-- the fix needs a file outside STATION
-- two attempts have failed the same check
-- a test looks wrong or needs changing
-- the work turns out riskier than the ticket's score (for example, it touches auth)
+A subagent can't ask questions while it works, so it escalates by stopping early and returning `ESCALATION:` with what it tried, the exact failure and the question. It escalates when the spec is ambiguous, the fix needs a file outside STATION, two attempts have failed the same check, a test looks wrong or needs a change beyond a TEST EDIT, or the work turns out riskier than the ticket's score (for example, it touches auth).
 
 When you receive an escalation, answer it and send a new ticket, or move the work up one tier. Each tier gets at most 2 attempts. If the executive also fails twice, stop and ask the user.
 
 ## 8. De-escalation (executive to lower tiers)
 
 Once a decision is made and only execution is left, hand it down:
-- design settled and tests written: implementation goes to a chef de partie
-- searches or surveys across many files: commis (`Explore`)
-- mechanical repetition (renames across files, formatting, boilerplate that follows a pattern): commis
-- reviewing a diff that scores 3 or less: do it yourself from the diff; don't spawn a sous
+- Design settled and tests written: implementation goes to a chef de partie.
+- Surveys that 3 greps can't answer, and mechanical repetition (renames across files, formatting, boilerplate that follows a pattern): commis.
+- Reviewing a diff that scores 3 or less: do it yourself from the diff; don't spawn a sous.
 
 Keep for yourself: anything still ambiguous, integration across stations, and the final pass.
 
@@ -122,7 +126,7 @@ Keep for yourself: anything still ambiguous, integration across stations, and th
 
 - When you know the region you need, Grep for it and then Read only those lines with `offset` and `limit`.
 - Keep these out of context: lockfiles, generated or minified files, whole logs (grep for the error), passing test output (read only failures) and raw subagent transcripts.
-- If finding something needs more than 3 queries, or you don't know where it is, send a commis. You get back conclusions as `file:line`.
+- Run up to 3 greps yourself first. Send a commis only if they don't find it. You get back conclusions as `file:line`.
 - Cap what a subagent returns using the ticket's RETURN line.
 - At the end of each phase, write a summary of decisions, open items and `file:line` references, and work from it instead of re-reading files.
 - Start a fresh subagent (not a fork, and not a continued agent) when you switch stations, after 2 failed attempts (the failed context biases the third), and for any review.
@@ -135,18 +139,16 @@ Keep for yourself: anything still ambiguous, integration across stations, and th
 - The executive doing mechanical work: bulk renames, grep sweeps, boilerplate.
 - A commis making design decisions: API shape, schema, error semantics.
 - Delegating a task whose ticket is vaguer than the work itself.
-- Spending more on delegation than the task costs, such as spawning an agent for a 3-line fix.
-- Writing code before tests.
-- Writing 200 lines where 20 would do.
+- Spending more on delegation than the task costs: an agent for a 3-line fix, or a commis for a search three greps would do.
+- Writing code before tests, or 200 lines where 20 would do.
 - Adding abstractions, config or dependencies nobody asked for.
 - Trusting a subagent's "tests pass" without running them yourself.
 - A lower tier editing tests to make them pass.
-- Briefing a reviewer with your hypothesis, which it will then tend to confirm.
+- Reviewing your own high-risk work, or briefing a reviewer with your hypothesis, which it will then tend to confirm.
+- Parallel subagents sharing one working copy.
 
 ## 11. When not to use this skill
 
-Work inline, with no routing or tickets, on a one-file edit of up to about 20 lines that scores 3 or less, on questions or code reading, and on lookups whose target you already know.
-
-Tests first and the grilled cheese rules still apply to small code changes. An edit that doesn't change behaviour (a typo, a comment, a rename the compiler checks) needs no new test; just run the existing tests.
+Work inline, with no routing or tickets, on a one-file edit of up to about 20 lines that scores 3 or less, on questions or code reading, and on lookups whose target you already know. Tests first and the grilled cheese rules still apply to small code changes. An edit that doesn't change behaviour (a typo, a comment, a rename the compiler checks) needs no new test; just run the existing tests.
 
 Worked routing examples, a filled-in ticket, and the fallback for tools without model switching are in [reference.md](reference.md). Read it only when the rubric is unclear.

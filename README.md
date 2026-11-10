@@ -44,6 +44,7 @@ Each version is a proof of concept (POC):
 | Version | Notes |
 |---|---|
 | `v1` | Baseline: routing rubric, grilled cheese rules, tests first, order ticket, escalation rules, token discipline |
+| `v2` | After the first POC (a 31-commit UI audit plus feature work on a production app). The pass now requires the production build and a check at narrow width. Independent review and security scans become a hard gate for risky work and every deploy. Parallel stations each get their own worktree. Subagents edit only with edit tools. Test edits that keep the assertion must be listed and approved. Guard tests enforce conventions. No delegating what three greps can do. |
 
 ## Comparing versions
 

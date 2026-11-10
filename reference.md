@@ -23,11 +23,14 @@ TASK: Parse uploaded CSVs into Row objects, rejecting malformed lines with line 
 STATION: src/importer/csv_parse.py
 INPUTS: Row dataclass at src/importer/models.py:12; existing reader helper
         src/util/io.py:40 open_text() handles encoding - reuse it.
-CONSTRAINTS: stdlib csv only, no new deps; ~40 lines; max 10 MB enforced by caller.
-DONE WHEN: `pytest tests/importer/test_csv_parse.py` passes; that file unchanged; ruff clean
+CONSTRAINTS: stdlib csv only, no new deps; ~40 lines; max 10 MB enforced by caller;
+             edit files only with the Edit/Write tools, never shell rewrites
+DONE WHEN: `pytest tests/importer/test_csv_parse.py` passes; ruff clean;
+           `python -m build` passes (no UI, so no width check)
 ESCALATE IF: ambiguous spec, edit needed outside STATION, 2 failed attempts,
              a test looks wrong, the work is riskier than this ticket says
-RETURN: <=15 lines: changes as file:line, test result, any ESCALATION.
+RETURN: <=15 lines: changes as file:line, test result, TEST EDITS (or none),
+        any ESCALATION.
 ```
 
 ## When the tool has no model switching
