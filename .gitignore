@@ -1,0 +1,5 @@
+# POC findings from private projects
+results/
+
+.DS_Store
+Thumbs.db
